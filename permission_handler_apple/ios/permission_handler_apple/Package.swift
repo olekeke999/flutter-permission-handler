@@ -21,17 +21,59 @@ import Foundation
 
 let env = ProcessInfo.processInfo.environment
 
-/// Walk up from Package.swift looking for Runner/Info.plist.
-/// Works when the package is resolved via Flutter's .symlinks/ directory.
+func loadInfoPlist(at url: URL) -> [String: Any]? {
+    NSDictionary(contentsOf: url) as? [String: Any]
+}
+
+func appendInfoPlistCandidates(from dir: URL, to candidates: inout [URL]) {
+    candidates.append(dir.appendingPathComponent("Runner/Info.plist"))
+    candidates.append(dir.appendingPathComponent("ios/Runner/Info.plist"))
+
+    if let children = try? FileManager.default.contentsOfDirectory(
+        at: dir,
+        includingPropertiesForKeys: [.isDirectoryKey],
+        options: [.skipsHiddenFiles]
+    ) {
+        for child in children {
+            let values = try? child.resourceValues(forKeys: [.isDirectoryKey])
+            if values?.isDirectory == true {
+                candidates.append(child.appendingPathComponent("ios/Runner/Info.plist"))
+            }
+        }
+    }
+}
+
+/// Find the host app's Runner/Info.plist.
+///
+/// Flutter can resolve this package through a local plugin path, a generated
+/// SPM package, or an Xcode package cache. Search bounded Flutter app layouts
+/// around the package and current working directory.
 func findInfoPlist() -> [String: Any] {
-    var dir = URL(fileURLWithPath: #file).deletingLastPathComponent()
-    for _ in 0..<8 {
-        let candidate = dir.appendingPathComponent("Runner/Info.plist")
-        if let plist = NSDictionary(contentsOf: candidate) as? [String: Any] {
+    var candidates: [URL] = []
+
+    let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent()
+    let currentDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+
+    for root in [packageDir, currentDir] {
+        var dir = root
+        for _ in 0..<10 {
+            appendInfoPlistCandidates(from: dir, to: &candidates)
+            let parent = dir.deletingLastPathComponent()
+            if parent.path == dir.path {
+                break
+            }
+            dir = parent
+        }
+    }
+
+    var seen = Set<String>()
+    for candidate in candidates {
+        let path = candidate.standardizedFileURL.path
+        if seen.insert(path).inserted, let plist = loadInfoPlist(at: candidate) {
             return plist
         }
-        dir = dir.deletingLastPathComponent()
     }
+
     return [:]
 }
 
@@ -137,9 +179,15 @@ let package = Package(
     products: [
         .library(name: "permission-handler-apple", targets: ["permission_handler_apple"]),
     ],
+    dependencies: [
+        .package(name: "FlutterFramework", path: "../FlutterFramework"),
+    ],
     targets: [
         .target(
             name: "permission_handler_apple",
+            dependencies: [
+                .product(name: "FlutterFramework", package: "FlutterFramework"),
+            ],
             path: "Sources/permission_handler_apple",
             resources: [
                 .process("PrivacyInfo.xcprivacy"),
