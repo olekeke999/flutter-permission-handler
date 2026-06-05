@@ -1,3 +1,7 @@
+## 9.4.10
+
+* Fixed Info.plist lookup in Package.swift to auto-apply permissions.
+
 ## 9.4.9
 
 * Rewrites copyleft code from stackoverflow to fix compliance issue.
