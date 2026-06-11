@@ -58,7 +58,7 @@
 	<string>photos</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>reminders</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
+<key>NSSpeechRecognitionUsageDescription</key>
 	<string>speech</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>appTrackingTransparency</string>
